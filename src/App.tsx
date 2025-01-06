@@ -2,6 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import styled from '@emotion/styled'
 import { motion, useMotionValue, useSpring } from 'framer-motion'
 
+interface DeploymentLog {
+  id: number;
+  agent: string;
+  steps: string[];
+  currentStep: number;
+  showDeployed: boolean;
+  stats?: {
+    fte: number;
+    savings: number;
+  };
+}
+
+interface Line {
+  id: number;
+  x: number;
+  y: number;
+  length: number;
+  rotation: number;
+  speed: number;
+}
+
 const Container = styled.div`
   height: 100vh;
   background: #000;
@@ -21,25 +42,82 @@ const Header = styled.header`
   display: flex;
   justify-content: space-between;
   align-items: center;
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
 `
 
 const Logo = styled.img`
-  width: 196px;
-  height: 90px;
+  width: 160px;
+  height: 74px;
   opacity: 1;
+
+  @media (max-width: 768px) {
+    width: 120px;
+    height: 55px;
+  }
 `
 
-const CTAButton = styled(motion.button)`
+const CTAContainer = styled(motion.div)`
+  position: relative;
+  display: flex;
+  align-items: center;
+`
+
+const CTAInput = styled(motion.input)`
   background: transparent;
   color: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
   font-size: 0.875rem;
   font-weight: 500;
   border-radius: 4px;
+  outline: none;
+  width: 100%;
+  text-overflow: ellipsis;
+  
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 0.5rem 2.5rem 0.5rem 1rem;
+    font-size: 0.8125rem;
+  }
+`
+
+const SubmitIcon = styled(motion.button)`
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 36px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  z-index: 2;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.9);
+  }
+`
+
+const CTAButton = styled(motion.div)`
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  
+  @media (max-width: 768px) {
+    font-size: 0.8125rem;
+  }
   
   &:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -53,6 +131,11 @@ const Content = styled.main`
   height: 100vh;
   padding-top: 0;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
 `
 
 const LeftSection = styled.div`
@@ -63,21 +146,42 @@ const LeftSection = styled.div`
   position: relative;
   z-index: 2;
   padding-top: 75px;
+
+  @media (max-width: 768px) {
+    padding: 2rem;
+    padding-top: 120px;
+    text-align: left;
+  }
 `
 
 const TaglineContainer = styled.div`
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+
+  @media (max-width: 768px) {
+    text-align: left;
+  }
 `
 
-const Tagline = styled.h1`
-  font-size: 3.5rem;
+const TaglineText = styled.div`
+  display: block;
+  font-size: 2.75rem;
   font-weight: 700;
   line-height: 1.2;
   margin: 0;
-  position: relative;
+  
+  @media (max-width: 768px) {
+    font-size: 2rem;
+  }
+
+  &.with-button {
+    display: flex;
+    align-items: center;
+    gap: 0rem;
+  }
 `
 
 const RightSection = styled.div`
@@ -91,6 +195,16 @@ const RightSection = styled.div`
   height: 100%;
   overflow: hidden;
   padding-top: 150px;
+
+  @media (max-width: 768px) {
+    padding: 1rem;
+    padding-top: 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+  }
 `
 
 const AnimatedBackground = styled.div`
@@ -129,6 +243,13 @@ const TerminalWindow = styled.div`
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 768px) {
+    padding: 1rem 0.75rem;
+    height: 60vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
 `
 
 const TerminalContent = styled.div`
@@ -246,7 +367,12 @@ const TrainingStep = styled(motion.div)`
   margin-left: 1.5rem;
   margin-top: 0.75rem;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    font-size: 0.7rem;
+  }
 
   &::before {
     content: '>';
@@ -259,9 +385,30 @@ const DeployedStatus = styled(motion.div)`
   color: #00ff00;
   margin-top: 1.5rem;
   margin-left: 1.5rem;
-  font-weight: bold;
-  letter-spacing: 2px;
-  font-size: 1rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+  margin-right: 1rem;
+  
+  @media (max-width: 768px) {
+    font-size: 0.75rem;
+    margin-left: 1rem;
+    margin-right: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  span.separator {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: normal;
+  }
+
+  span.stats {
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: normal;
+    font-weight: normal;
+  }
 `
 
 const WaitlistMessage = styled(motion.div)`
@@ -295,19 +442,19 @@ const PromptInput = styled.input`
 `
 
 const GradientButton = styled(motion.button)`
-  position: absolute;
-  right:34%;
-  bottom: 0.1rem;
-  padding: 1rem 2rem;
-  font-size: 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  height: 2.75rem;
+  margin-top: 4px;
+  font-size: 1rem;
   font-weight: 500;
   color: white;
   cursor: pointer;
   border: none;
   border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  margin-left: 1rem;
+  white-space: nowrap;
   background: linear-gradient(
     115deg,
     #3FC78A 0%,
@@ -322,11 +469,24 @@ const GradientButton = styled(motion.button)`
   background-size: 300% 300%;
   animation: gradient-animation 8s ease infinite;
   z-index: 10;
+  transform-origin: center;
+  position: relative;
+  
+  @media (max-width: 768px) {
+    height: 2rem;
+    padding: 0 1.25rem;
+    font-size: 0.9375rem;
+    margin-left: 0.75rem;
+  }
 
   &::after {
     content: '→';
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     margin-left: 0.25rem;
+
+    @media (max-width: 768px) {
+      font-size: 0.9375rem;
+    }
   }
 
   @keyframes gradient-animation {
@@ -347,12 +507,18 @@ const GradientButton = styled(motion.button)`
 `
 
 const SubTagline = styled.div`
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.6);
-  margin-top: 0.75rem;
+  margin-top: 1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
+  @media (max-width: 768px) {
+    justify-content: flex-start;
+    font-size: 0.8125rem;
+    margin-top: 0.75rem;
+  }
 
   em {
     color: rgba(255, 255, 255, 0.8);
@@ -409,18 +575,34 @@ function generateAgentLog() {
   const steps = Array(3).fill(null).map(() => 
     trainingSteps[Math.floor(Math.random() * trainingSteps.length)]
   )
+  
+  // Generate FTE first
+  const fte = -(Math.floor(Math.random() * 3) + 1)  // Random between -1 and -3
+  // Calculate savings based on FTE (using absolute value of FTE)
+  const baseSavings = Math.floor(Math.random() * (120 - 70 + 1) + 70)
+  const savings = baseSavings * Math.abs(fte)
 
-  return { agent, steps, id: Date.now() }
+  // Use a timestamp in milliseconds for unique, descending IDs
+  return { 
+    agent, 
+    steps, 
+    id: -Date.now(), // Negative to ensure newer items have smaller numbers
+    stats: { fte, savings }
+  }
 }
 
 function App() {
-  const [deploymentLogs, setDeploymentLogs] = useState([])
+  const [deploymentLogs, setDeploymentLogs] = useState<DeploymentLog[]>([])
   const [showWaitlist, setShowWaitlist] = useState(false)
   const [jobDescription, setJobDescription] = useState('')
   const [emailInput, setEmailInput] = useState('')
   const [isJobDescriptionSubmitted, setIsJobDescriptionSubmitted] = useState(false)
-  const terminalRef = useRef(null)
-  const [lines, setLines] = useState([])
+  const [showHeaderEmail, setShowHeaderEmail] = useState(false)
+  const [headerEmail, setHeaderEmail] = useState('')
+  const [isDeploying, setIsDeploying] = useState(false)
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const headerEmailRef = useRef<HTMLInputElement>(null)
+  const [lines, setLines] = useState<Line[]>([])
   const mouseX = useMotionValue(0)
   const mouseY = useMotionValue(0)
   
@@ -428,53 +610,81 @@ function App() {
   const springX = useSpring(mouseX, springConfig)
   const springY = useSpring(mouseY, springConfig)
 
+  // Generate initial static agents
+  const initialAgents: DeploymentLog[] = [
+    {
+      agent: 'Marketing Specialist',
+      steps: [
+        'Validating output quality...',
+        'Calibrating response patterns...',
+        'Synchronizing with existing systems...'
+      ],
+      id: -1,
+      currentStep: 2,
+      showDeployed: true,
+      stats: { fte: -2, savings: 206 }
+    },
+    {
+      agent: 'Social Media Strategist',
+      steps: [
+        'Training on domain knowledge...',
+        'Integrating best practices...',
+        'Optimizing workflow patterns...'
+      ],
+      id: -2,
+      currentStep: 2,
+      showDeployed: true,
+      stats: { fte: -1, savings: 83 }
+    }
+  ]
+
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: ReturnType<typeof setTimeout>;
+    let isCurrentlyDeploying = false;
     
     const addNewAgent = () => {
+      if (isCurrentlyDeploying) return;
+      isCurrentlyDeploying = true;
       const newLog = generateAgentLog()
-      setDeploymentLogs(prev => {
-        // If this is the first agent (empty list), or if the previous first agent is fully deployed
-        if (prev.length === 0 || (prev[0].steps.length === 3 && prev[0].showDeployed)) {
-          return [{
-            ...newLog,
-            currentStep: -1,
-            showDeployed: false,
-            steps: []
-          }, ...prev.slice(0, 3)] // Keep last 4 agents
-        }
-        return prev
-      })
-      timeout = setTimeout(addNextStep, 3000)
+      setDeploymentLogs(prev => [{
+        ...newLog,
+        currentStep: -1,
+        showDeployed: false,
+        steps: []
+      }, ...prev])
+      timeout = setTimeout(addNextStep, 1500)
     }
 
     const addNextStep = () => {
       setDeploymentLogs(prev => {
         const newLogs = [...prev]
-        const currentLog = newLogs[0]
-        
-        if (!currentLog) return prev
-
-        if (currentLog.steps.length < 3) {
+        if (newLogs[0] && newLogs[0].steps.length < 3) {
           const allSteps = generateAgentLog().steps
-          currentLog.steps = [...currentLog.steps, allSteps[currentLog.steps.length]]
-          currentLog.currentStep = currentLog.steps.length - 1
-          timeout = setTimeout(addNextStep, 4000)
-        } else if (!currentLog.showDeployed) {
-          currentLog.showDeployed = true
-          timeout = setTimeout(addNewAgent, 6000)
+          newLogs[0] = {
+            ...newLogs[0],
+            steps: [...(newLogs[0].steps || []), allSteps[newLogs[0].steps.length]],
+            currentStep: newLogs[0].steps.length
+          }
+          timeout = setTimeout(addNextStep, 2000)
+        } else if (newLogs[0] && !newLogs[0].showDeployed) {
+          newLogs[0] = {
+            ...newLogs[0],
+            showDeployed: true
+          }
+          isCurrentlyDeploying = false;
+          timeout = setTimeout(addNewAgent, 3000)
         }
-
         return newLogs
       })
     }
 
-    // Start with just one agent
-    if (deploymentLogs.length === 0) {
-      addNewAgent()
-    }
+    // Start the cycle immediately with shorter initial delay
+    timeout = setTimeout(addNewAgent, 3000)
 
-    return () => clearTimeout(timeout)
+    return () => {
+      clearTimeout(timeout)
+      isCurrentlyDeploying = false
+    }
   }, [])
 
   // Scroll to top when new content is added
@@ -528,7 +738,7 @@ function App() {
   }
 
   useEffect(() => {
-    const handleKeyPress = (e) => {
+    const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'Enter') {
         setShowWaitlist(true)
       }
@@ -538,17 +748,31 @@ function App() {
     return () => window.removeEventListener('keypress', handleKeyPress)
   }, [])
 
-  const handleInputKeyPress = (e) => {
+  const handleInputKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       if (!isJobDescriptionSubmitted) {
         setIsJobDescriptionSubmitted(true)
         setShowWaitlist(true)
-        setJobDescription(e.target.value)
+        setJobDescription(e.currentTarget.value)
       } else {
-        // Handle email submission here
-        setEmailInput(e.target.value)
-        // You can add email submission logic here
+        setEmailInput(e.currentTarget.value)
       }
+    }
+  }
+
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  const handleSubmit = () => {
+    if (headerEmail) {
+      console.log('Submitted email:', headerEmail)
+      setHeaderEmail('')
+      setIsExpanded(false)
+    }
+  }
+
+  const handleHeaderEmailSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && headerEmail) {
+      handleSubmit()
     }
   }
 
@@ -557,22 +781,61 @@ function App() {
       <Header>
         <Logo src="WHITENOBACKGROUNDST.svg" alt="Synthetic Teams" />
         <CTAButton
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          animate={{
+            width: isExpanded ? (window.innerWidth <= 768 ? 200 : 240) : 140,
+          }}
+          transition={{ duration: 0.3 }}
+          onClick={() => !isExpanded && setIsExpanded(true)}
         >
-          Request Access
+          {!isExpanded ? (
+            <motion.div
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                letterSpacing: '0.5px',
+                whiteSpace: 'nowrap',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+              }}
+            >
+              Request Access
+            </motion.div>
+          ) : (
+            <CTAContainer>
+              <CTAInput
+                autoFocus
+                placeholder="Enter email"
+                value={headerEmail}
+                onChange={(e) => setHeaderEmail(e.target.value)}
+                onKeyPress={handleHeaderEmailSubmit}
+              />
+              <SubmitIcon onClick={handleSubmit}>→</SubmitIcon>
+            </CTAContainer>
+          )}
         </CTAButton>
       </Header>
       <Content>
         <LeftSection>
           <TaglineContainer>
-            <Tagline>Deploy the Hybrid Workforce of the Future</Tagline>
-            <GradientButton
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              Apply Today
-            </GradientButton>
+            <TaglineText>Deploy the Hybrid</TaglineText>
+            <TaglineText>Workforce of the</TaglineText>
+            <TaglineText className="with-button">
+              Future
+              <GradientButton
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  const subject = encodeURIComponent("Application");
+                  const body = encodeURIComponent("I am the top 0.1% in [INSERT WHAT], here's proof: [INSERT PROOF]");
+                  window.location.href = `mailto:jobs@syntheticteams.com?subject=${subject}&body=${body}`;
+                }}
+              >
+                Apply Today
+              </GradientButton>
+            </TaglineText>
           </TaglineContainer>
           <SubTagline>
             hiring <em>human</em> engineers and ml researchers
@@ -643,9 +906,33 @@ function App() {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5 }}
                     >
-                      DEPLOYED
+                      DEPLOYED <span className="separator">|</span> <span className="stats">{`{ FTE: ${log.stats?.fte}, SAVINGS: +$${log.stats?.savings}K/YR }`}</span>
                     </DeployedStatus>
                   )}
+                </LogEntry>
+              ))}
+              {/* Render static initial agents after dynamic ones */}
+              {initialAgents.map((log) => (
+                <LogEntry key={log.id}>
+                  <motion.div
+                    initial={{ opacity: 1 }}
+                    animate={{ color: 'rgba(255, 255, 255, 0.9)', opacity: 1 }}
+                  >
+                    {log.agent}
+                  </motion.div>
+                  {log.steps.map((step, index) => (
+                    <TrainingStep
+                      key={`${log.id}-${index}`}
+                      initial={{ opacity: 1, x: 0 }}
+                    >
+                      {step}
+                    </TrainingStep>
+                  ))}
+                  <DeployedStatus
+                    initial={{ opacity: 1 }}
+                  >
+                    DEPLOYED <span className="separator">|</span> <span className="stats">{`{ FTE: ${log.stats?.fte}, SAVINGS: +$${log.stats?.savings}K/YR }`}</span>
+                  </DeployedStatus>
                 </LogEntry>
               ))}
             </TerminalContent>
